@@ -2,6 +2,14 @@
 
 An X-configuration quadrotor (1.06 kg) carrying a tendon-driven soft continuum arm (0.2 kg, 0.48 m backbone) mounted underneath it.
 
+<p align="center">
+  <img src="media/demo.gif" width="480" alt="Quadrotor flying a figure-eight, then hovering while the tendons sweep the soft arm in a circle">
+  <br><em>Demo mission at 2× speed. Full-resolution video: <a href="media/demo.mp4">media/demo.mp4</a></em>
+</p>
+
+![Rendered frames from the demo mission](media/snapshots.png)
+*(a) Hover with the arm hanging under gravity. (b) Figure-eight flight; inertial loads deflect the arm. (c)–(f) Hover while the tendons sweep the bending direction through a full revolution.*
+
 | File | Contents |
 |---|---|
 | `quad_continuum.xml` | MJCF model: quad, 4 rotor thrust actuators, the 12-segment continuum arm, 3 tendons with tension actuators |
