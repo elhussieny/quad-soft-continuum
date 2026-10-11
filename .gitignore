@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Generated outputs (reproduce with demo.py --headless / paper/make_figures.py)
+results/
+
+# Paper sources are kept out of the repo; only the reproduction script is tracked
+paper/*
+!paper/make_figures.py
+
+# OS / editors
+.DS_Store
+.vscode/
+.idea/

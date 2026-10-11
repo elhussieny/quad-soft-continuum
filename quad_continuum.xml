@@ -1,0 +1,183 @@
+<!--
+  Quadrotor (X configuration) carrying a tendon-driven soft continuum robot.
+
+  The continuum robot is modelled as a pseudo-rigid-body chain: N short capsule
+  segments connected by pairs of orthogonal compliant hinges (stiffness+damping),
+  which approximates a Cosserat rod bending in two directions. Three tendons run
+  along the backbone at 120 deg spacing and are pulled by tension actuators,
+  giving two-DOF bending of the soft arm.
+
+  Actuators (ctrl order):
+    0..3  rotor thrusts [N]           (rotor1..rotor4)
+    4..6  tendon tensions [N]         (tendon_a, tendon_b, tendon_c)
+-->
+<mujoco model="quad_continuum">
+  <compiler angle="radian" autolimits="true"/>
+  <option timestep="0.002" integrator="implicitfast" gravity="0 0 -9.81" density="1.2" viscosity="1.8e-5"/>
+
+  <visual>
+    <global offwidth="1280" offheight="720" azimuth="135" elevation="-20"/>
+    <headlight ambient="0.35 0.35 0.35" diffuse="0.6 0.6 0.6" specular="0.1 0.1 0.1"/>
+    <quality shadowsize="4096"/>
+  </visual>
+
+  <default>
+    <default class="seg">
+      <geom type="capsule" size="0.012 0.02" pos="0 0 -0.02" mass="0.015"
+            rgba="0.95 0.55 0.25 1" contype="2" conaffinity="1" friction="0.8 0.01 0.001"/>
+      <joint type="hinge" stiffness="0.06" damping="0.01" armature="1e-5" range="-0.6 0.6"/>
+      <site type="sphere" size="0.003" rgba="0.2 0.2 0.2 1"/>
+    </default>
+    <default class="rotor">
+      <geom type="cylinder" size="0.11 0.004" mass="0.01" rgba="0.2 0.2 0.2 0.35" contype="0" conaffinity="0"/>
+    </default>
+  </default>
+
+  <asset>
+    <texture name="grid" type="2d" builtin="checker" rgb1="0.2 0.3 0.4" rgb2="0.15 0.2 0.3" width="512" height="512" mark="edge" markrgb="0.4 0.5 0.6"/>
+    <material name="grid" texture="grid" texrepeat="8 8" reflectance="0.15"/>
+    <texture name="sky" type="skybox" builtin="gradient" rgb1="0.6 0.75 0.9" rgb2="0.1 0.15 0.25" width="512" height="512"/>
+    <material name="body" rgba="0.15 0.4 0.8 1" specular="0.5" shininess="0.6"/>
+    <material name="arm" rgba="0.25 0.25 0.28 1"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 6" dir="0 0 -1" directional="true" castshadow="true"/>
+    <geom name="floor" type="plane" size="10 10 0.1" material="grid"/>
+
+    <body name="quad" pos="0 0 1.0">
+      <freejoint name="root"/>
+      <camera name="chase" mode="trackcom" pos="-1.8 -1.8 1.0" xyaxes="0.707 -0.707 0 0.35 0.35 0.87"/>
+
+      <!-- Central hub + electronics (main mass) -->
+      <geom name="hub" type="box" size="0.07 0.07 0.025" mass="0.75" material="body"/>
+      <geom name="canopy" type="ellipsoid" size="0.06 0.05 0.03" pos="0 0 0.025" mass="0.05" rgba="0.1 0.1 0.12 1"/>
+      <!-- X-frame arms -->
+      <geom type="capsule" fromto="-0.177 -0.177 0  0.177  0.177 0" size="0.01" mass="0.06" material="arm"/>
+      <geom type="capsule" fromto="-0.177  0.177 0  0.177 -0.177 0" size="0.01" mass="0.06" material="arm"/>
+      <!-- Motor pods -->
+      <geom type="cylinder" size="0.018 0.015" pos=" 0.177  0.177 0.012" mass="0.02" rgba="0.6 0.6 0.6 1"/>
+      <geom type="cylinder" size="0.018 0.015" pos="-0.177  0.177 0.012" mass="0.02" rgba="0.6 0.6 0.6 1"/>
+      <geom type="cylinder" size="0.018 0.015" pos="-0.177 -0.177 0.012" mass="0.02" rgba="0.6 0.6 0.6 1"/>
+      <geom type="cylinder" size="0.018 0.015" pos=" 0.177 -0.177 0.012" mass="0.02" rgba="0.6 0.6 0.6 1"/>
+      <!-- Propeller discs (visual) -->
+      <geom class="rotor" pos=" 0.177  0.177 0.03" rgba="0.9 0.2 0.2 0.35"/>
+      <geom class="rotor" pos="-0.177  0.177 0.03"/>
+      <geom class="rotor" pos="-0.177 -0.177 0.03"/>
+      <geom class="rotor" pos=" 0.177 -0.177 0.03" rgba="0.9 0.2 0.2 0.35"/>
+
+      <!-- Thrust application points: rotor1 front-left, then CCW around -->
+      <site name="rotor1" pos=" 0.177  0.177 0.03" size="0.005"/>
+      <site name="rotor2" pos="-0.177  0.177 0.03" size="0.005"/>
+      <site name="rotor3" pos="-0.177 -0.177 0.03" size="0.005"/>
+      <site name="rotor4" pos=" 0.177 -0.177 0.03" size="0.005"/>
+      <site name="imu" pos="0 0 0"/>
+
+      <!-- Mounting flange + tendon anchors for the continuum robot -->
+      <geom type="cylinder" size="0.025 0.008" pos="0 0 -0.033" mass="0.02" rgba="0.3 0.3 0.3 1"/>
+      <site name="ta_0" pos=" 0.0160  0.0000 -0.041" size="0.003"/>
+      <site name="tb_0" pos="-0.0080  0.0139 -0.041" size="0.003"/>
+      <site name="tc_0" pos="-0.0080 -0.0139 -0.041" size="0.003"/>
+
+      <!-- ===================== Soft continuum robot (12 segments) ===================== -->
+      <body name="seg1" pos="0 0 -0.041" childclass="seg">
+        <joint name="s1x" axis="1 0 0"/><joint name="s1y" axis="0 1 0"/>
+        <geom/>
+        <site name="ta_1" pos=" 0.0160  0.0000 -0.04"/><site name="tb_1" pos="-0.0080  0.0139 -0.04"/><site name="tc_1" pos="-0.0080 -0.0139 -0.04"/>
+        <body name="seg2" pos="0 0 -0.04">
+          <joint name="s2x" axis="1 0 0"/><joint name="s2y" axis="0 1 0"/>
+          <geom/>
+          <site name="ta_2" pos=" 0.0160  0.0000 -0.04"/><site name="tb_2" pos="-0.0080  0.0139 -0.04"/><site name="tc_2" pos="-0.0080 -0.0139 -0.04"/>
+          <body name="seg3" pos="0 0 -0.04">
+            <joint name="s3x" axis="1 0 0"/><joint name="s3y" axis="0 1 0"/>
+            <geom/>
+            <site name="ta_3" pos=" 0.0160  0.0000 -0.04"/><site name="tb_3" pos="-0.0080  0.0139 -0.04"/><site name="tc_3" pos="-0.0080 -0.0139 -0.04"/>
+            <body name="seg4" pos="0 0 -0.04">
+              <joint name="s4x" axis="1 0 0"/><joint name="s4y" axis="0 1 0"/>
+              <geom/>
+              <site name="ta_4" pos=" 0.0160  0.0000 -0.04"/><site name="tb_4" pos="-0.0080  0.0139 -0.04"/><site name="tc_4" pos="-0.0080 -0.0139 -0.04"/>
+              <body name="seg5" pos="0 0 -0.04">
+                <joint name="s5x" axis="1 0 0"/><joint name="s5y" axis="0 1 0"/>
+                <geom/>
+                <site name="ta_5" pos=" 0.0160  0.0000 -0.04"/><site name="tb_5" pos="-0.0080  0.0139 -0.04"/><site name="tc_5" pos="-0.0080 -0.0139 -0.04"/>
+                <body name="seg6" pos="0 0 -0.04">
+                  <joint name="s6x" axis="1 0 0"/><joint name="s6y" axis="0 1 0"/>
+                  <geom/>
+                  <site name="ta_6" pos=" 0.0160  0.0000 -0.04"/><site name="tb_6" pos="-0.0080  0.0139 -0.04"/><site name="tc_6" pos="-0.0080 -0.0139 -0.04"/>
+                  <body name="seg7" pos="0 0 -0.04">
+                    <joint name="s7x" axis="1 0 0"/><joint name="s7y" axis="0 1 0"/>
+                    <geom/>
+                    <site name="ta_7" pos=" 0.0160  0.0000 -0.04"/><site name="tb_7" pos="-0.0080  0.0139 -0.04"/><site name="tc_7" pos="-0.0080 -0.0139 -0.04"/>
+                    <body name="seg8" pos="0 0 -0.04">
+                      <joint name="s8x" axis="1 0 0"/><joint name="s8y" axis="0 1 0"/>
+                      <geom/>
+                      <site name="ta_8" pos=" 0.0160  0.0000 -0.04"/><site name="tb_8" pos="-0.0080  0.0139 -0.04"/><site name="tc_8" pos="-0.0080 -0.0139 -0.04"/>
+                      <body name="seg9" pos="0 0 -0.04">
+                        <joint name="s9x" axis="1 0 0"/><joint name="s9y" axis="0 1 0"/>
+                        <geom/>
+                        <site name="ta_9" pos=" 0.0160  0.0000 -0.04"/><site name="tb_9" pos="-0.0080  0.0139 -0.04"/><site name="tc_9" pos="-0.0080 -0.0139 -0.04"/>
+                        <body name="seg10" pos="0 0 -0.04">
+                          <joint name="s10x" axis="1 0 0"/><joint name="s10y" axis="0 1 0"/>
+                          <geom/>
+                          <site name="ta_10" pos=" 0.0160  0.0000 -0.04"/><site name="tb_10" pos="-0.0080  0.0139 -0.04"/><site name="tc_10" pos="-0.0080 -0.0139 -0.04"/>
+                          <body name="seg11" pos="0 0 -0.04">
+                            <joint name="s11x" axis="1 0 0"/><joint name="s11y" axis="0 1 0"/>
+                            <geom/>
+                            <site name="ta_11" pos=" 0.0160  0.0000 -0.04"/><site name="tb_11" pos="-0.0080  0.0139 -0.04"/><site name="tc_11" pos="-0.0080 -0.0139 -0.04"/>
+                            <body name="seg12" pos="0 0 -0.04">
+                              <joint name="s12x" axis="1 0 0"/><joint name="s12y" axis="0 1 0"/>
+                              <geom/>
+                              <site name="ta_12" pos=" 0.0160  0.0000 -0.04"/><site name="tb_12" pos="-0.0080  0.0139 -0.04"/><site name="tc_12" pos="-0.0080 -0.0139 -0.04"/>
+                              <!-- End effector (soft gripper tip) -->
+                              <geom name="tip" type="sphere" size="0.018" pos="0 0 -0.045" mass="0.02" rgba="0.9 0.9 0.2 1"/>
+                              <site name="tip" pos="0 0 -0.045" size="0.005"/>
+                            </body>
+                          </body>
+                        </body>
+                      </body>
+                    </body>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <tendon>
+    <spatial name="tendon_a" width="0.0025" rgba="0.9 0.1 0.1 1" limited="false">
+      <site site="ta_0"/><site site="ta_1"/><site site="ta_2"/><site site="ta_3"/><site site="ta_4"/><site site="ta_5"/><site site="ta_6"/>
+      <site site="ta_7"/><site site="ta_8"/><site site="ta_9"/><site site="ta_10"/><site site="ta_11"/><site site="ta_12"/>
+    </spatial>
+    <spatial name="tendon_b" width="0.0025" rgba="0.1 0.8 0.1 1" limited="false">
+      <site site="tb_0"/><site site="tb_1"/><site site="tb_2"/><site site="tb_3"/><site site="tb_4"/><site site="tb_5"/><site site="tb_6"/>
+      <site site="tb_7"/><site site="tb_8"/><site site="tb_9"/><site site="tb_10"/><site site="tb_11"/><site site="tb_12"/>
+    </spatial>
+    <spatial name="tendon_c" width="0.0025" rgba="0.1 0.3 0.9 1" limited="false">
+      <site site="tc_0"/><site site="tc_1"/><site site="tc_2"/><site site="tc_3"/><site site="tc_4"/><site site="tc_5"/><site site="tc_6"/>
+      <site site="tc_7"/><site site="tc_8"/><site site="tc_9"/><site site="tc_10"/><site site="tc_11"/><site site="tc_12"/>
+    </spatial>
+  </tendon>
+
+  <actuator>
+    <!-- Rotor thrust along body z; reaction (drag) torque about z with alternating sign. -->
+    <motor name="rotor1" site="rotor1" gear="0 0 1 0 0  0.016" ctrlrange="0 8"/>
+    <motor name="rotor2" site="rotor2" gear="0 0 1 0 0 -0.016" ctrlrange="0 8"/>
+    <motor name="rotor3" site="rotor3" gear="0 0 1 0 0  0.016" ctrlrange="0 8"/>
+    <motor name="rotor4" site="rotor4" gear="0 0 1 0 0 -0.016" ctrlrange="0 8"/>
+    <!-- Tendons can only pull: positive control = tension, gear -1 shortens the tendon. -->
+    <motor name="tendon_a" tendon="tendon_a" gear="-1" ctrlrange="0 6"/>
+    <motor name="tendon_b" tendon="tendon_b" gear="-1" ctrlrange="0 6"/>
+    <motor name="tendon_c" tendon="tendon_c" gear="-1" ctrlrange="0 6"/>
+  </actuator>
+
+  <sensor>
+    <framepos name="quad_pos" objtype="body" objname="quad"/>
+    <framequat name="quad_quat" objtype="body" objname="quad"/>
+    <framelinvel name="quad_vel" objtype="body" objname="quad"/>
+    <gyro name="quad_gyro" site="imu"/>
+    <framepos name="tip_pos" objtype="site" objname="tip"/>
+  </sensor>
+</mujoco>
